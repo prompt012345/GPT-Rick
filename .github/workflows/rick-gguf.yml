@@ -36,6 +36,24 @@ jobs:
       - name: Cloner llama.cpp
         run: git clone --depth 1 https://github.com/ggml-org/llama.cpp
 
+      - name: Corriger le bug du convertisseur GPT-2 (tenseurs attn.bias)
+        run: |
+          python3 - <<'EOF'
+          import pathlib
+          p = pathlib.Path("llama.cpp/conversion/gpt2.py")
+          lines = p.read_text().split("\n")
+          done = False
+          for i, l in enumerate(lines):
+              if ".attn.masked_bias" in l and l.strip().startswith("if name.endswith"):
+                  nxt = lines[i + 1]
+                  if "yield from super().modify_tensors(data_torch, name, bid)" in nxt:
+                      lines[i + 1] = nxt[: len(nxt) - len(nxt.lstrip())] + "return"
+                      done = True
+                  break
+          p.write_text("\n".join(lines))
+          print("patch applied" if done else "patch not needed")
+          EOF
+
       - name: Dépendances (torch CPU)
         run: |
           pip install torch --index-url https://download.pytorch.org/whl/cpu
